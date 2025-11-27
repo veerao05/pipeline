@@ -1,0 +1,84 @@
+# Simple GitLab CI/CD Pipeline
+
+stages:
+  - test
+  - build
+  - deploy
+
+# Define variables
+variables:
+  DOCKER_IMAGE: python:3.9
+
+# Test Stage
+test_job:
+  stage: test
+  image: python:3.9
+  script:
+    - echo "Running tests..."
+    - pip install -r requirements.txt
+    - pip install pytest pytest-cov
+    - pytest tests/ -v --cov=app
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+  only:
+    - merge_requests
+    - main
+  allow_failure: false
+
+# Lint Stage
+lint_job:
+  stage: test
+  image: python:3.9
+  script:
+    - echo "Running linting..."
+    - pip install flake8 black
+    - flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+    - black --check app/
+  only:
+    - merge_requests
+    - main
+  allow_failure: true
+
+# Build Stage
+build_job:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Building Docker image..."
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+  only:
+    - main
+  when: on_success
+
+# Deploy Stage (Example)
+deploy_job:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "Deploying application..."
+    - echo "Deployment successful!"
+  environment:
+    name: production
+    url: https://example.com
+  only:
+    - main
+  when: on_success
+
+# Manual deployment
+deploy_manual:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "Manual deployment started..."
+    - echo "Application deployed!"
+  when: manual
+  only:
+    - main
