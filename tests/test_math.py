@@ -1,14 +1,11 @@
 import pytest
+import sys
+import os
 
+# Add parent directory to path to import math module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def add(a, b):
-    """Simple function to add two numbers"""
-    return a + b
-
-
-def subtract(a, b):
-    """Simple function to subtract two numbers"""
-    return a - b
+from math import add, subtract
 
 
 class TestMath:
