@@ -5,8 +5,8 @@ import os
 # Add parent directory to path to import our custom math module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import from our custom math module (not the built-in math module)
-import math as our_math
+# Import from our custom my_math module (not the built-in math module)
+import my_math as our_math
 
 
 class TestMath:
@@ -37,6 +37,7 @@ class TestMath:
 def test_add_simple():
     """Simple standalone test"""
     assert our_math.add(1, 1) == 2
+
 
 def test_subtract_simple():
     """Simple standalone test"""

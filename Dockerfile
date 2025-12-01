@@ -11,8 +11,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose port (example)
-EXPOSE 5000
-
-# Run application (example)
-CMD ["python", "app.py"]
+# Run math module
+CMD ["python", "-c", "import my_math; print('Math module loaded')"]

@@ -18,7 +18,7 @@ pylint_job:
     - echo "Running pylint..."
     - pip install -r requirements.txt
     - pip install pylint
-    - pylint math.py
+    - pylint my_math.py
   only:
     - merge_requests
     - main
@@ -31,7 +31,7 @@ black_job:
   script:
     - echo "Running black..."
     - pip install black
-    - black --check --diff math.py tests/
+    - black --check --diff my_math.py tests/
   only:
     - merge_requests
     - main
@@ -44,7 +44,7 @@ mypy_job:
   script:
     - echo "Running mypy..."
     - pip install mypy
-    - mypy math.py
+    - mypy my_math.py
   only:
     - merge_requests
     - main
