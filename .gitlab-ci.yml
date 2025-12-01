@@ -1,111 +1,217 @@
-# Simple GitLab CI/CD Pipeline
+# GitLab CD (Continuous Deployment) Pipeline - Nimbus DEV Cluster
 
 stages:
-  - lint
-  - test
-  - build
   - deploy
+  - health_check
+  - rollback
 
-# Define variables
 variables:
-  DOCKER_IMAGE: python:3.9
+  DOCKER_REGISTRY: $CI_REGISTRY
+  DOCKER_REGISTRY_USER: $CI_REGISTRY_USER
+  DOCKER_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
+  KUBECONFIG: /tmp/kubeconfig
+  APP_NAMESPACE: myrtus-gitlab
+  APP_DEPLOYMENT: math-app-deployment
+  APP_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  CLUSTER_NAME: "nimbus"
+  CLUSTER_SERVER: "https://rancher.hiro-develop.nl/k8s/clusters/c-m-smpdn56q"
+  KUBE_USER: "nimbus"
 
-# Pylint Stage
-pylint_job:
-  stage: lint
-  image: python:3.9
-  script:
-    - echo "Running pylint..."
-    - pip install -r requirements.txt
-    - pip install pylint
-    - pylint my_math.py
-  only:
-    - merge_requests
-    - main
-  allow_failure: false
-
-# Black Stage
-black_job:
-  stage: lint
-  image: python:3.9
-  script:
-    - echo "Running black..."
-    - pip install black
-    - black --check --diff my_math.py tests/
-  only:
-    - merge_requests
-    - main
-  allow_failure: false
-
-# MyPy Stage
-mypy_job:
-  stage: lint
-  image: python:3.9
-  script:
-    - echo "Running mypy..."
-    - pip install mypy
-    - mypy my_math.py
-  only:
-    - merge_requests
-    - main
-  allow_failure: false
-
-# Test Stage
-test_job:
-  stage: test
-  image: python:3.9
-  script:
-    - echo "Running tests..."
-    - pip install -r requirements.txt
-    - pip install pytest pytest-cov
-    - pytest tests/ -v --cov=.
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-    paths:
-      - htmlcov/
-  only:
-    - merge_requests
-    - main
-  allow_failure: false
-
-# Build Stage
-build_job:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - echo "Building Docker image..."
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
-  only:
-    - main
-  when: on_success
-
-# Deploy Stage (Example)
-deploy_job:
+# Deploy to Nimbus DEV Cluster
+deploy_dev:
   stage: deploy
-  image: alpine:latest
+  image: bitnami/kubectl:latest
   script:
-    - echo "Deploying application..."
-    - echo "Deployment successful!"
+    - echo "Deploying to Nimbus DEV cluster..."
+
+    # Create kubeconfig file
+    - |
+      mkdir -p ~/.kube
+      cat > $KUBECONFIG <<EOF
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - name: "nimbus"
+        cluster:
+          server: "$CLUSTER_SERVER"
+      users:
+      - name: "nimbus"
+        user:
+          token: "$KUBE_TOKEN"
+      contexts:
+      - name: "nimbus"
+        context:
+          user: "nimbus"
+          cluster: "nimbus"
+      current-context: "nimbus"
+      EOF
+
+    # Verify cluster connection
+    - kubectl cluster-info
+    - kubectl get nodes
+
+    # Create namespace if it doesn't exist
+    - kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+    # Create Docker registry secret for pulling images
+    - kubectl create secret docker-registry regcred 
+      --docker-server=$CI_REGISTRY 
+      --docker-username=$DOCKER_REGISTRY_USER 
+      --docker-password=$DOCKER_REGISTRY_PASSWORD 
+      --docker-email=$CI_PROJECT_USER_LOGIN@example.com
+      -n $APP_NAMESPACE 
+      --dry-run=client -o yaml | kubectl apply -f -
+
+    # Apply Kubernetes manifests
+    - echo "Applying Kubernetes manifests..."
+    - kubectl apply -f k8s/ -n $APP_NAMESPACE
+    
+    # Update deployment image to current commit
+    - echo "Updating deployment image to $APP_IMAGE..."
+    - kubectl set image deployment/$APP_DEPLOYMENT 
+      math-app=$APP_IMAGE 
+      -n $APP_NAMESPACE 
+      --record
+
+    # Wait for rollout
+    - kubectl rollout status deployment/$APP_DEPLOYMENT -n $APP_NAMESPACE --timeout=5m
+
+    # Show deployment status
+    - kubectl describe deployment $APP_DEPLOYMENT -n $APP_NAMESPACE
+    - kubectl get pods -n $APP_NAMESPACE
+
+    - echo "Deployment to Nimbus DEV cluster successful!"
   environment:
-    name: production
-    url: https://example.com
+    name: dev
+    url: https://rancher.hiro-develop.nl
+    kubernetes:
+      namespace: $APP_NAMESPACE
   only:
     - main
   when: on_success
+  allow_failure: false
 
-# Manual deployment
-deploy_manual:
-  stage: deploy
-  image: alpine:latest
+# Health Check on Nimbus DEV
+health_check_dev:
+  stage: health_check
+  image: bitnami/kubectl:latest
   script:
-    - echo "Manual deployment started..."
-    - echo "Application deployed!"
-  when: manual
+    - echo "Running health checks on Nimbus DEV cluster..."
+    
+    # Create kubeconfig file
+    - |
+      mkdir -p ~/.kube
+      cat > $KUBECONFIG <<EOF
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - name: "nimbus"
+        cluster:
+          server: "$CLUSTER_SERVER"
+      users:
+      - name: "nimbus"
+        user:
+          token: "$KUBE_TOKEN"
+      contexts:
+      - name: "nimbus"
+        context:
+          user: "nimbus"
+          cluster: "nimbus"
+      current-context: "nimbus"
+      EOF
+    
+    # Check if pods are running
+    - kubectl get pods -n $APP_NAMESPACE -l app=math-app
+    - kubectl describe pods -n $APP_NAMESPACE -l app=math-app
+    - kubectl logs -n $APP_NAMESPACE -l app=math-app --tail=10
+    
+    - echo "Nimbus DEV health check passed!"
   only:
     - main
+  when: on_success
+  allow_failure: true
+
+# Rollback Nimbus DEV Cluster (Manual)
+rollback_dev:
+  stage: rollback
+  image: bitnami/kubectl:latest
+  script:
+    - echo "Rolling back Nimbus DEV cluster to previous version..."
+
+    # Create kubeconfig file
+    - |
+      mkdir -p ~/.kube
+      cat > $KUBECONFIG <<EOF
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - name: "nimbus"
+        cluster:
+          server: "$CLUSTER_SERVER"
+      users:
+      - name: "nimbus"
+        user:
+          token: "$KUBE_TOKEN"
+      contexts:
+      - name: "nimbus"
+        context:
+          user: "nimbus"
+          cluster: "nimbus"
+      current-context: "nimbus"
+      EOF
+
+    # Rollback deployment
+    - kubectl rollout undo deployment/$APP_DEPLOYMENT -n $APP_NAMESPACE
+
+    # Wait for rollback
+    - kubectl rollout status deployment/$APP_DEPLOYMENT -n $APP_NAMESPACE --timeout=5m
+
+    # Show deployment status
+    - kubectl describe deployment $APP_DEPLOYMENT -n $APP_NAMESPACE
+    - kubectl get pods -n $APP_NAMESPACE
+
+    - echo "Rollback completed!"
+  environment:
+    name: dev
+    action: rollback
+  only:
+    - main
+  when: manual
+  allow_failure: false
+
+# View Deployment Logs
+view_logs:
+  stage: health_check
+  image: bitnami/kubectl:latest
+  script:
+    - echo "Viewing deployment logs..."
+
+    # Create kubeconfig file
+    - |
+      mkdir -p ~/.kube
+      cat > $KUBECONFIG <<EOF
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - name: "nimbus"
+        cluster:
+          server: "$CLUSTER_SERVER"
+      users:
+      - name: "nimbus"
+        user:
+          token: "$KUBE_TOKEN"
+      contexts:
+      - name: "nimbus"
+        context:
+          user: "nimbus"
+          cluster: "nimbus"
+      current-context: "nimbus"
+      EOF
+
+    # Get logs from all pods
+    - kubectl logs -n $APP_NAMESPACE -l app=math-app --tail=100
+
+  only:
+    - main
+  when: manual
+  allow_failure: true
