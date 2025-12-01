@@ -62,18 +62,16 @@ deploy_dev:
       -n $APP_NAMESPACE 
       --dry-run=client -o yaml | kubectl apply -f -
 
-    # Check if deployment exists, if not create it
-    - |
-      if kubectl get deployment $APP_DEPLOYMENT -n $APP_NAMESPACE 2>/dev/null; then
-        echo "Deployment exists, updating image..."
-        kubectl set image deployment/$APP_DEPLOYMENT 
-          $APP_DEPLOYMENT=$APP_IMAGE 
-          -n $APP_NAMESPACE 
-          --record
-      else
-        echo "Deployment does not exist, please create it first with proper manifests"
-        exit 1
-      fi
+    # Apply Kubernetes manifests
+    - echo "Applying Kubernetes manifests..."
+    - kubectl apply -f k8s/ -n $APP_NAMESPACE
+    
+    # Update deployment image to current commit
+    - echo "Updating deployment image to $APP_IMAGE..."
+    - kubectl set image deployment/$APP_DEPLOYMENT 
+      math-app=$APP_IMAGE 
+      -n $APP_NAMESPACE 
+      --record
 
     # Wait for rollout
     - kubectl rollout status deployment/$APP_DEPLOYMENT -n $APP_NAMESPACE --timeout=5m
@@ -96,15 +94,37 @@ deploy_dev:
 # Health Check on Nimbus DEV
 health_check_dev:
   stage: health_check
-  image: curlimages/curl:latest
+  image: bitnami/kubectl:latest
   script:
     - echo "Running health checks on Nimbus DEV cluster..."
+    
+    # Create kubeconfig file
     - |
-      for i in {1..5}; do
-        echo "Health check attempt $i..."
-        curl -f https://your-app-dev.hiro-develop.nl/health && break
-        sleep 10
-      done
+      mkdir -p ~/.kube
+      cat > $KUBECONFIG <<EOF
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - name: "nimbus"
+        cluster:
+          server: "$CLUSTER_SERVER"
+      users:
+      - name: "nimbus"
+        user:
+          token: "$KUBE_TOKEN"
+      contexts:
+      - name: "nimbus"
+        context:
+          user: "nimbus"
+          cluster: "nimbus"
+      current-context: "nimbus"
+      EOF
+    
+    # Check if pods are running
+    - kubectl get pods -n $APP_NAMESPACE -l app=math-app
+    - kubectl describe pods -n $APP_NAMESPACE -l app=math-app
+    - kubectl logs -n $APP_NAMESPACE -l app=math-app --tail=10
+    
     - echo "Nimbus DEV health check passed!"
   only:
     - main
@@ -189,7 +209,7 @@ view_logs:
       EOF
 
     # Get logs from all pods
-    - kubectl logs -n $APP_NAMESPACE -l app=$APP_DEPLOYMENT --tail=100
+    - kubectl logs -n $APP_NAMESPACE -l app=math-app --tail=100
 
   only:
     - main

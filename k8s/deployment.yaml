@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: math-app-deployment
+  namespace: myrtus-gitlab
+  labels:
+    app: math-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: math-app
+  template:
+    metadata:
+      labels:
+        app: math-app
+    spec:
+      containers:
+      - name: math-app
+        image: registry.gitlab.com/veenarao/myrtus-gitlab:main
+        imagePullPolicy: Always
+        command: ["python", "-c", "import my_math; import time; print('Math module loaded'); print(f'Add: {my_math.add(2, 3)}'); print(f'Subtract: {my_math.subtract(5, 2)}'); time.sleep(3600)"]
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: myrtus-gitlab
