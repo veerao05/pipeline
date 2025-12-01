@@ -20,13 +20,19 @@ variables:
 # Deploy to Nimbus DEV Cluster
 deploy_dev:
   stage: deploy
-  image: bitnami/kubectl:latest
+  image: ubuntu:latest
+  before_script:
+    - apt-get update -y
+    - apt-get install -y curl
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/
   script:
     - echo "Deploying to Nimbus DEV cluster..."
 
     # Create kubeconfig file
+    - mkdir -p ~/.kube
     - |
-      mkdir -p ~/.kube
       cat > $KUBECONFIG <<EOF
       apiVersion: v1
       kind: Config
@@ -54,13 +60,14 @@ deploy_dev:
     - kubectl create namespace $APP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
     # Create Docker registry secret for pulling images
-    - kubectl create secret docker-registry regcred 
-      --docker-server=$CI_REGISTRY 
-      --docker-username=$DOCKER_REGISTRY_USER 
-      --docker-password=$DOCKER_REGISTRY_PASSWORD 
-      --docker-email=$CI_PROJECT_USER_LOGIN@example.com
-      -n $APP_NAMESPACE 
-      --dry-run=client -o yaml | kubectl apply -f -
+    - |
+      kubectl create secret docker-registry regcred \
+        --docker-server=$CI_REGISTRY \
+        --docker-username=$DOCKER_REGISTRY_USER \
+        --docker-password=$DOCKER_REGISTRY_PASSWORD \
+        --docker-email=$CI_PROJECT_USER_LOGIN@example.com \
+        -n $APP_NAMESPACE \
+        --dry-run=client -o yaml | kubectl apply -f -
 
     # Apply Kubernetes manifests
     - echo "Applying Kubernetes manifests..."
@@ -68,10 +75,11 @@ deploy_dev:
     
     # Update deployment image to current commit
     - echo "Updating deployment image to $APP_IMAGE..."
-    - kubectl set image deployment/$APP_DEPLOYMENT 
-      math-app=$APP_IMAGE 
-      -n $APP_NAMESPACE 
-      --record
+    - |
+      kubectl set image deployment/$APP_DEPLOYMENT \
+        math-app=$APP_IMAGE \
+        -n $APP_NAMESPACE \
+        --record
 
     # Wait for rollout
     - kubectl rollout status deployment/$APP_DEPLOYMENT -n $APP_NAMESPACE --timeout=5m
@@ -94,7 +102,13 @@ deploy_dev:
 # Health Check on Nimbus DEV
 health_check_dev:
   stage: health_check
-  image: bitnami/kubectl:latest
+  image: ubuntu:latest
+  before_script:
+    - apt-get update -y
+    - apt-get install -y curl
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/
   script:
     - echo "Running health checks on Nimbus DEV cluster..."
     
@@ -134,7 +148,13 @@ health_check_dev:
 # Rollback Nimbus DEV Cluster (Manual)
 rollback_dev:
   stage: rollback
-  image: bitnami/kubectl:latest
+  image: ubuntu:latest
+  before_script:
+    - apt-get update -y
+    - apt-get install -y curl
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/
   script:
     - echo "Rolling back Nimbus DEV cluster to previous version..."
 
@@ -182,7 +202,13 @@ rollback_dev:
 # View Deployment Logs
 view_logs:
   stage: health_check
-  image: bitnami/kubectl:latest
+  image: ubuntu:latest
+  before_script:
+    - apt-get update -y
+    - apt-get install -y curl
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/
   script:
     - echo "Viewing deployment logs..."
 
