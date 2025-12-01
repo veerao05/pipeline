@@ -173,7 +173,7 @@ rollback_dev:
     - echo "Rollback completed!"
   environment:
     name: dev
-    action: rollback
+    action: stop
   only:
     - main
   when: manual
