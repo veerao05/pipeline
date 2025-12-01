@@ -15,9 +15,11 @@ spec:
       labels:
         app: math-app
     spec:
+      imagePullSecrets:
+      - name: regcred
       containers:
       - name: math-app
-        image: registry.gitlab.com/veenarao/myrtus-gitlab:main
+        image: registry.gitlab.com/veenaraofr/myrtus-gitlab:main
         imagePullPolicy: Always
         command: ["python", "-c", "import my_math; import time; print('Math module loaded'); print(f'Add: {my_math.add(2, 3)}'); print(f'Subtract: {my_math.subtract(5, 2)}'); time.sleep(3600)"]
         resources:

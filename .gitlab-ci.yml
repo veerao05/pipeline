@@ -1,6 +1,7 @@
 # GitLab CD (Continuous Deployment) Pipeline - Nimbus DEV Cluster
 
 stages:
+  - build
   - deploy
   - health_check
   - rollback
@@ -16,6 +17,23 @@ variables:
   CLUSTER_NAME: "nimbus"
   CLUSTER_SERVER: "https://rancher.hiro-develop.nl/k8s/clusters/c-m-smpdn56q"
   KUBE_USER: "nimbus"
+
+# Build and Push Docker Image
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo $DOCKER_REGISTRY_PASSWORD | docker login -u $DOCKER_REGISTRY_USER --password-stdin $DOCKER_REGISTRY
+  script:
+    - echo "Building Docker image..."
+    - docker build -t $APP_IMAGE .
+    - docker push $APP_IMAGE
+    - echo "Docker image built and pushed successfully!"
+  only:
+    - main
+  when: on_success
 
 # Deploy to Nimbus DEV Cluster
 deploy_dev:
