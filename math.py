@@ -1,5 +1,4 @@
 """Math module with basic arithmetic operations."""
-import os
 
 def add(a: float, b: float) -> float:
     """Simple function to add two numbers.
