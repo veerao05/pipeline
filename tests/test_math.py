@@ -38,7 +38,6 @@ def test_add_simple():
     """Simple standalone test"""
     assert our_math.add(1, 1) == 2
 
-
 def test_subtract_simple():
     """Simple standalone test"""
     assert our_math.subtract(10, 5) == 5
