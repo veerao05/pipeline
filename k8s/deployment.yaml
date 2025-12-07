@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: math-app-deployment
-  namespace: myrtus-gitlab
+  name: math-app
+  namespace: pipeline-local
   labels:
     app: math-app
 spec:
@@ -15,23 +15,20 @@ spec:
       labels:
         app: math-app
     spec:
-      imagePullSecrets:
-      - name: regcred
       containers:
       - name: math-app
-        image: registry.gitlab.com/veenaraofr/myrtus-gitlab:main
+        image: docker.io/${DOCKERHUB_USERNAME}/pipeline:${IMAGE_TAG}
         imagePullPolicy: Always
-        command: ["python", "-c", "import my_math; import time; print('Math module loaded'); print(f'Add: {my_math.add(2, 3)}'); print(f'Subtract: {my_math.subtract(5, 2)}'); time.sleep(3600)"]
+        command: ["python", "my_math.py"]
         resources:
           requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
             memory: "64Mi"
             cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
-      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: myrtus-gitlab
+  name: pipeline-local

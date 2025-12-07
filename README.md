@@ -1,46 +1,69 @@
-# myrtus-gitlab
+# pipeline
 
 
 
 ## Getting started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Pipeline project repository.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Getting Started
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+Clone the repository:
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/veenaraofr/myrtus-gitlab.git
-git branch -M main
-git push -uf origin main
+git clone git@github.com:veerao05/pipeline.git
+cd pipeline
 ```
 
-## Integrate with your tools
+## Environment Setup
 
-- [ ] [Set up project integrations](https://gitlab.com/veenaraofr/myrtus-gitlab/-/settings/integrations)
+### Prerequisites
+1. **Docker Hub account** - Sign up at [hub.docker.com](https://hub.docker.com)
+2. **Minikube running** - `minikube start`
+3. **kubectl configured** - Can access your cluster
 
-## Collaborate with your team
+### Step 1: Docker Hub Setup
+1. Login to [Docker Hub](https://hub.docker.com)
+2. Go to **Account Settings** → **Security** → **Access Tokens**
+3. Click **New Access Token**
+4. Name: `github-actions`
+5. Permissions: **Public Repo Read, Write**
+6. **Copy and save the token** (you won't see it again)
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Step 2: GitHub Repository Secrets
+1. Go to your GitHub repo → **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret** and add:
+   - **Name:** `DOCKERHUB_USERNAME` **Value:** your Docker Hub username
+   - **Name:** `DOCKERHUB_TOKEN` **Value:** the access token from Step 1
 
-## Test and Deploy
+### Step 3: Minikube Kubernetes Secrets
+Run these commands and copy the outputs:
 
-Use the built-in continuous integration in GitLab.
+```bash
+# 1. Get base64 encoded kubeconfig
+kubectl config view --flatten --minify | base64
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+# 2. Get cluster server URL  
+kubectl cluster-info
+
+# 3. Create service account and get token
+kubectl create serviceaccount github-actions
+kubectl create clusterrolebinding github-actions --clusterrole=cluster-admin --serviceaccount=default:github-actions
+kubectl create token github-actions
+```
+
+### Step 4: Add Kubernetes Secrets to GitHub
+Add these additional repository secrets:
+- **Name:** `LOCAL_KUBE_CONFIG` **Value:** output from command #1
+- **Name:** `LOCAL_CLUSTER_SERVER` **Value:** server URL from command #2  
+- **Name:** `LOCAL_KUBE_TOKEN` **Value:** token from command #3
+
+### Step 5: Test the Pipeline
+1. **Push to main branch** → triggers the workflow
+2. **Check Actions tab** → see build/test/deploy progress
+3. **Verify deployment:** `kubectl get pods -n pipeline-local`
+
+**Complete automated CI/CD from code push to live deployment!**
 
 ***
 
