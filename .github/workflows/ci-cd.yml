@@ -98,7 +98,7 @@ jobs:
     - name: Deploy to local cluster
       run: |
         export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
-        export IMAGE_TAG="${{ github.sha }}"
+        export IMAGE_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
         envsubst < k8s/deployment.yaml | kubectl apply -f -
 
     - name: Wait for deployment
