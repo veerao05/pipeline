@@ -81,25 +81,15 @@ jobs:
 
   deploy-local:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: github.ref == 'refs/heads/main'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'v1.28.0'
-
-    - name: Configure kubectl for local cluster
+    - name: Configure kubectl for minikube
       run: |
-        mkdir -p $HOME/.kube
-        echo "${{ secrets.LOCAL_KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
-        kubectl config set-cluster local-cluster --server=${{ secrets.LOCAL_CLUSTER_SERVER }} --insecure-skip-tls-verify=true
-        kubectl config set-credentials local-user --token=${{ secrets.LOCAL_KUBE_TOKEN }}
-        kubectl config set-context local-context --cluster=local-cluster --user=local-user
-        kubectl config use-context local-context
+        kubectl config use-context minikube
 
     - name: Create namespace if not exists
       run: |
